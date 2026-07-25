@@ -1,10 +1,11 @@
 """
-Schemas for message-related requests and responses.
+Schemas for message-related requests and responses (adapted to real schema).
 """
 
 from pydantic import BaseModel, Field
 from typing import Optional, List
 from datetime import datetime
+import uuid
 
 
 class MessageClassificationRequest(BaseModel):
@@ -40,12 +41,12 @@ class MessageClassificationResponse(BaseModel):
 class CostCalculationRequest(BaseModel):
     """Request schema for cost calculation."""
     
-    message_id: int = Field(description="ID of the message to calculate cost for")
+    message_id: str = Field(description="UUID of the message to calculate cost for")
     
     class Config:
         json_schema_extra = {
             "example": {
-                "message_id": 1
+                "message_id": "550e8400-e29b-41d4-a716-446655440000"
             }
         }
 
@@ -53,7 +54,7 @@ class CostCalculationRequest(BaseModel):
 class CostCalculationResponse(BaseModel):
     """Response schema for cost calculation."""
     
-    message_id: int
+    message_id: str
     telefone: str
     categoria: str
     country_code: str
@@ -64,13 +65,13 @@ class CostCalculationResponse(BaseModel):
     class Config:
         json_schema_extra = {
             "example": {
-                "message_id": 1,
+                "message_id": "550e8400-e29b-41d4-a716-446655440000",
                 "telefone": "+5511999999999",
                 "categoria": "authentication",
                 "country_code": "55",
                 "cost_per_message": 0.015,
                 "custo_total": 0.015,
-                "currency": "USD"
+                "currency": "BRL"
             }
         }
 
@@ -102,13 +103,13 @@ class BatchProcessResponse(BaseModel):
                 "total_cost": 0.075,
                 "messages": [
                     {
-                        "message_id": 1,
+                        "message_id": "550e8400-e29b-41d4-a716-446655440000",
                         "telefone": "+5511999999999",
                         "categoria": "authentication",
                         "country_code": "55",
                         "cost_per_message": 0.015,
                         "custo_total": 0.015,
-                        "currency": "USD"
+                        "currency": "BRL"
                     }
                 ]
             }
@@ -120,13 +121,13 @@ class ErrorResponse(BaseModel):
     
     error: str = Field(description="Error message")
     detail: Optional[str] = Field(default=None, description="Detailed error information")
-    message_id: Optional[int] = Field(default=None, description="ID of the message that caused the error")
+    message_id: Optional[str] = Field(default=None, description="UUID of the message that caused the error")
     
     class Config:
         json_schema_extra = {
             "example": {
                 "error": "Pricing not found",
                 "detail": "No pricing entry found for country_code=55 and category=authentication",
-                "message_id": 1
+                "message_id": "550e8400-e29b-41d4-a716-446655440000"
             }
         }

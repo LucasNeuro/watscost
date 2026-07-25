@@ -1,5 +1,5 @@
 """
-Service for calculating WhatsApp message costs.
+Service for calculating WhatsApp message costs (adapted to real schema).
 """
 
 from typing import Optional, Tuple
@@ -37,13 +37,16 @@ class CostCalculatorService:
         Raises:
             ValueError: If classification or pricing lookup fails
         """
-        # Extract country code if not present
-        country_code = message.country_code or self.supabase_service.extract_country_code(message.telefone)
+        # Extract country code from phone number
+        country_code = self.supabase_service.extract_country_code(message.telefone)
+        
+        # Get message text from JSONB
+        message_text = self.supabase_service.get_message_text(message)
         
         # Classify the message
-        category = self.mistral_service.classify_message_with_fallback(message.mensagem)
+        category = self.mistral_service.classify_message_with_fallback(message_text)
         
-        # Get pricing
+        # Get pricing (using message_category instead of category)
         pricing = self.supabase_service.get_pricing(country_code, category)
         
         if pricing is None:
@@ -54,12 +57,12 @@ class CostCalculatorService:
         
         return category, pricing.cost_per_message, country_code
     
-    def process_message(self, message_id: int) -> CostCalculationResponse:
+    def process_message(self, message_id: str) -> CostCalculationResponse:
         """
         Process a single message: classify, calculate cost, and update database.
         
         Args:
-            message_id: The ID of the message to process
+            message_id: The UUID of the message to process
             
         Returns:
             CostCalculationResponse: The processed message with cost information
@@ -81,20 +84,20 @@ class CostCalculatorService:
         
         # Update the message in database
         updated_message = self.supabase_service.update_message_cost(
-            message_id=message_id,
+            message_id=str(message.id),
             categoria=category,
             custo_total=custo_total,
             country_code=country_code
         )
         
         return CostCalculationResponse(
-            message_id=message_id,
+            message_id=str(message.id),
             telefone=updated_message.telefone,
             categoria=category,
             country_code=country_code,
             cost_per_message=cost_per_message,
             custo_total=custo_total,
-            currency="USD"
+            currency=updated_message.moeda or "BRL"
         )
     
     def process_messages_batch(self, limit: int = 100) -> Tuple[int, float, list]:
@@ -116,7 +119,7 @@ class CostCalculatorService:
         
         for message in messages:
             try:
-                response = self.process_message(message.id)
+                response = self.process_message(str(message.id))
                 processed_messages.append(response)
                 total_cost += response.custo_total
                 processed_count += 1

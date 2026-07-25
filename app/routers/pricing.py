@@ -1,5 +1,5 @@
 """
-Router for pricing-related endpoints.
+Router for pricing-related endpoints (adapted to real schema).
 """
 
 from fastapi import APIRouter, HTTPException, status
@@ -58,7 +58,7 @@ async def get_pricing(country_code: str, category: str):
         
         return PricingResponse(
             country_code=pricing.country_code,
-            category=pricing.category,
+            message_category=pricing.message_category,
             cost_per_message=pricing.cost_per_message,
             currency=pricing.currency
         )

@@ -1,5 +1,5 @@
 """
-Service for interacting with Supabase database.
+Service for interacting with Supabase database (adapted to real schema).
 """
 
 from typing import List, Optional, Dict, Any
@@ -8,6 +8,7 @@ from app.models.message import WhatsAppMessage, WhatsAppMessageResponse
 from app.models.pricing import MetaPricing
 from app.core.config import settings
 from app.utils.phone_utils import extract_country_code as phone_extract_country_code
+import re
 
 
 class SupabaseService:
@@ -58,9 +59,6 @@ class SupabaseService:
             messages = []
             for row in response.data:
                 message = WhatsAppMessage(**row)
-                # Add country_code if not present
-                if not message.country_code:
-                    message.country_code = self.extract_country_code(message.telefone)
                 messages.append(message)
             
             return messages
@@ -68,12 +66,12 @@ class SupabaseService:
         except Exception as e:
             raise ValueError(f"Failed to fetch unprocessed messages: {str(e)}")
     
-    def get_message_by_id(self, message_id: int) -> Optional[WhatsAppMessage]:
+    def get_message_by_id(self, message_id: str) -> Optional[WhatsAppMessage]:
         """
         Get a specific message by its ID.
         
         Args:
-            message_id: The ID of the message to retrieve
+            message_id: The UUID of the message to retrieve
             
         Returns:
             Optional[WhatsAppMessage]: The message if found, None otherwise
@@ -86,10 +84,7 @@ class SupabaseService:
                 .execute()
             
             if response.data:
-                message = WhatsAppMessage(**response.data)
-                if not message.country_code:
-                    message.country_code = self.extract_country_code(message.telefone)
-                return message
+                return WhatsAppMessage(**response.data)
             return None
             
         except Exception as e:
@@ -107,10 +102,11 @@ class SupabaseService:
             Optional[MetaPricing]: Pricing information if found, None otherwise
         """
         try:
+            # Note: The real schema uses 'message_category' instead of 'category'
             response = self.client.table("meta_pricing") \
                 .select("*") \
                 .eq("country_code", country_code) \
-                .eq("category", category) \
+                .eq("message_category", category) \
                 .single() \
                 .execute()
             
@@ -121,12 +117,12 @@ class SupabaseService:
         except Exception as e:
             raise ValueError(f"Failed to fetch pricing for country_code={country_code}, category={category}: {str(e)}")
     
-    def update_message_cost(self, message_id: int, categoria: str, custo_total: float, country_code: str) -> WhatsAppMessageResponse:
+    def update_message_cost(self, message_id: str, categoria: str, custo_total: float, country_code: str) -> WhatsAppMessageResponse:
         """
         Update a message with its calculated cost and category.
         
         Args:
-            message_id: The ID of the message to update
+            message_id: The UUID of the message to update
             categoria: The classified category
             custo_total: The calculated total cost
             country_code: The extracted country code
@@ -138,11 +134,16 @@ class SupabaseService:
             ValueError: If the update fails
         """
         try:
+            # Get the current message to preserve existing fields
+            current_message = self.get_message_by_id(message_id)
+            if not current_message:
+                raise ValueError(f"Message {message_id} not found")
+            
+            # Update only the fields we need
             response = self.client.table("whatsapp_messages") \
                 .update({
-                    "categoria": categoria,
                     "custo_total": custo_total,
-                    "country_code": country_code
+                    "moeda": "BRL"
                 }) \
                 .eq("id", message_id) \
                 .select("*") \
@@ -150,7 +151,11 @@ class SupabaseService:
                 .execute()
             
             if response.data:
-                return WhatsAppMessageResponse(**response.data)
+                # Create response with additional fields
+                message_data = response.data
+                message_data["categoria"] = categoria
+                message_data["country_code"] = country_code
+                return WhatsAppMessageResponse(**message_data)
             else:
                 raise ValueError(f"Message {message_id} not found or update failed")
             
@@ -168,10 +173,6 @@ class SupabaseService:
             WhatsAppMessageResponse: The created message
         """
         try:
-            # Add country_code if phone number is provided
-            if "telefone" in message_data and "country_code" not in message_data:
-                message_data["country_code"] = self.extract_country_code(message_data["telefone"])
-            
             response = self.client.table("whatsapp_messages") \
                 .insert(message_data) \
                 .select("*") \
@@ -202,6 +203,23 @@ class SupabaseService:
             
         except Exception as e:
             raise ValueError(f"Failed to fetch all pricing: {str(e)}")
+    
+    def get_message_text(self, message: WhatsAppMessage) -> str:
+        """
+        Extract text from message JSONB field.
+        
+        Args:
+            message: The WhatsApp message
+            
+        Returns:
+            str: The message text content
+        """
+        if isinstance(message.mensagem, dict):
+            return message.mensagem.get("text", "")
+        elif isinstance(message.mensagem, str):
+            return message.mensagem
+        else:
+            return str(message.mensagem)
 
 
 # Global Supabase service instance

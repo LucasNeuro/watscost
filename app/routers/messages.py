@@ -1,9 +1,9 @@
 """
-Router for WhatsApp message endpoints.
+Router for WhatsApp message endpoints (adapted to real schema).
 """
 
-from fastapi import APIRouter, HTTPException, status, Depends
-from typing import List
+from fastapi import APIRouter, HTTPException, status, Query
+from typing import List, Optional
 from app.schemas.message import (
     CostCalculationRequest,
     CostCalculationResponse,
@@ -14,6 +14,7 @@ from app.schemas.message import (
 from app.services.cost_calculator import cost_calculator_service
 from app.services.supabase_service import supabase_service
 from app.models.message import WhatsAppMessage, WhatsAppMessageResponse
+import uuid
 
 
 router = APIRouter(prefix="/messages", tags=["Messages"])
@@ -25,7 +26,7 @@ router = APIRouter(prefix="/messages", tags=["Messages"])
     summary="Get unprocessed messages",
     description="Retrieve WhatsApp messages that haven't had their cost calculated yet"
 )
-async def get_unprocessed_messages(limit: int = 100):
+async def get_unprocessed_messages(limit: int = Query(default=100, ge=1, le=1000)):
     """
     Get a list of unprocessed WhatsApp messages.
     
@@ -62,10 +63,12 @@ async def calculate_cost(request: CostCalculationRequest):
     4. Calculates the total cost
     5. Updates the message in the database
     
-    - **message_id**: The ID of the message to process
+    - **message_id**: The UUID of the message to process
     """
     try:
-        response = cost_calculator_service.process_message(request.message_id)
+        # Convert message_id to string if it's a UUID
+        message_id_str = str(request.message_id)
+        response = cost_calculator_service.process_message(message_id_str)
         return response
     except ValueError as e:
         if "not found" in str(e):
@@ -125,13 +128,13 @@ async def batch_process(request: BatchProcessRequest):
         404: {"model": ErrorResponse, "description": "Message not found"}
     },
     summary="Get message by ID",
-    description="Retrieve a specific WhatsApp message by its ID"
+    description="Retrieve a specific WhatsApp message by its UUID"
 )
-async def get_message(message_id: int):
+async def get_message(message_id: str):
     """
-    Get a specific message by its ID.
+    Get a specific message by its UUID.
     
-    - **message_id**: The ID of the message to retrieve
+    - **message_id**: The UUID of the message to retrieve
     """
     try:
         message = supabase_service.get_message_by_id(message_id)
@@ -154,7 +157,7 @@ async def get_message(message_id: int):
     summary="Get all messages",
     description="Retrieve all WhatsApp messages from the database"
 )
-async def get_all_messages(limit: int = 100, offset: int = 0):
+async def get_all_messages(limit: int = Query(default=100, ge=1, le=1000), offset: int = Query(default=0)):
     """
     Get all WhatsApp messages.
     
