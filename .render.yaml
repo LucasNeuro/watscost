@@ -1,0 +1,14 @@
+# Render.com configuration
+# Force pip instead of Poetry
+
+# Use pip for dependency management
+use_pip: true
+
+# Python version
+python_version: 3.11
+
+# Build command
+build_command: pip install -r requirements.txt
+
+# Start command
+start_command: uvicorn app.main:app --host 0.0.0.0 --port $PORT
