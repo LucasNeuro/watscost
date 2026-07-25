@@ -5,7 +5,7 @@ Main FastAPI application for WhatsApp Cost Calculator.
 from fastapi import FastAPI, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
-from app.routers import messages, pricing, classification
+from app.routers import messages, pricing, classification, analysis
 from app.core.database import supabase_client
 from app.services.supabase_service import supabase_service
 import uvicorn
@@ -25,9 +25,10 @@ def create_app() -> FastAPI:
         # WhatsApp Cost Calculator API
         
         This API calculates the cost of WhatsApp messages by:
-        1. Classifying messages using Mistral AI
-        2. Looking up pricing based on country and category
-        3. Updating the database with calculated costs
+        1. **Reading messages from Supabase** (whatsapp_messages table)
+        2. **Classifying messages** using Mistral AI
+        3. **Looking up pricing** based on country and category (meta_pricing table)
+        4. **Updating messages** with calculated costs
         
         ## Features
         
@@ -35,6 +36,12 @@ def create_app() -> FastAPI:
         * **Cost Calculation**: Calculate costs based on country-specific pricing
         * **Batch Processing**: Process multiple messages at once
         * **Database Integration**: Read and update messages in Supabase
+        * **Analysis Endpoints**: Full analysis of your WhatsApp messages
+        
+        ## Tables Used
+        
+        - **whatsapp_messages**: Stores WhatsApp messages with UUID, JSONB mensagem, telefone, custo_total
+        - **meta_pricing**: Stores pricing with country_code, message_category, cost_per_message
         
         ## Authentication
         
@@ -68,6 +75,7 @@ def create_app() -> FastAPI:
     main_router.include_router(messages.router)
     main_router.include_router(pricing.router)
     main_router.include_router(classification.router)
+    main_router.include_router(analysis.router)
     app.include_router(main_router)
     
     # Root endpoint
